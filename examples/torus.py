@@ -31,13 +31,12 @@ rate includes buffering.
 import time
 from mininet.net import Mininet
 from mininet.node import CPULimitedHost
-from mininet.topolib import TreeTopo
+from mininet.topolib import TorusTopo
 from mininet.util import custom, waitListening
 from mininet.log import setLogLevel, info
-from mininet.topo import LinearTopo
 
 
-def bwtest( cpuLimits, k_list, period_us=100000, seconds=10 ):
+def bwtest( cpuLimits, depth_list, period_us=100000, seconds=10 ):
     """Example/test of link and CPU bandwidth limits
        cpu: cpu limit as fraction of overall CPU time"""
 
@@ -47,7 +46,7 @@ def bwtest( cpuLimits, k_list, period_us=100000, seconds=10 ):
     for sched in 'rt', 'cfs':
         info( '*** Testing with', sched, 'bandwidth limiting\n' )
         for cpu in range(len(cpuLimits)):
-            topo = LinearTopo(k=k_list[cpu], n=k_list[cpu])
+            topo = TorusTopo(depth_list[cpu],depth_list[cpu], n=1)
             # cpu is the cpu fraction for all hosts, so we divide
             # it across two hosts
             host = custom( CPULimitedHost, sched=sched,
@@ -110,8 +109,8 @@ if __name__ == '__main__':
     setLogLevel( 'info' )
     # These are the limits for the hosts/iperfs - the
     # rest is for system processes
-    limits = [ .25, .0625, .015]
-    depth = [ 2, 4, 8 ]
+    limits = [ .0625, .015]
+    depth = [ 4, 8 ]
     out, times= bwtest( limits, depth )
     dump( out )
     print(times)

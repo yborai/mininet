@@ -4,6 +4,7 @@ from mininet.topo import Topo
 from mininet.node import OVSSwitch
 
 """
+@package MeshTopo
 Ref. : https://gist.github.com/lantz/7853026
 OVS Bridge with Spanning Tree Protocol
 

@@ -38,6 +38,40 @@ def TreeNet( depth=1, fanout=2, **kwargs ):
     return Mininet( topo, **kwargs )
 
 
+class MeshTopo( Topo ):
+    "Demo Setup"
+
+    def build( self, switchnum=3, enable_all = True ):
+        "Create custom topo."
+
+        # Init values
+        switches = switchnum   # total switchs
+        cons = 1        # connections with next switch
+        if cons >= switches:
+            cons = switches - 1
+        hosts = 1      # nodes per switch
+
+        # Create host and Switch
+        # Add link :: host to switch
+        for s_num in range(1,switches+1):
+            switch = self.addSwitch("s%s" %(s_num))
+            for h_num in range(1,hosts+1):
+                host = self.addHost("h%s" %(h_num + ((s_num - 1) * hosts)))
+                self.addLink(host,switch)
+
+        # Add link :: switch to switch
+        for src in range(1,switches+1):
+            for c_num in range(1,cons+1):
+                dst = src + c_num
+                if dst <= switches:
+                    print("s%s" %src,"s%s" %dst)
+                    self.addLink("s%s" %src,"s%s" %dst)
+                else:
+                    dst = dst - switches
+                    if src - dst > cons:
+                        print("s%s" %src,"s%s" %dst)
+                        self.addLink("s%s" %src,"s%s" %dst)
+
 class TorusTopo( Topo ):
     """2-D Torus topology
        WARNING: this topology has LOOPS and WILL NOT WORK
@@ -78,5 +112,9 @@ class TorusTopo( Topo ):
                 sw3 = switches[ ( i + 1 ) % x, j ]
                 self.addLink( sw1, sw2 )
                 self.addLink( sw1, sw3 )
+
+if __name__ == "__main__":
+    MeshTopo(7)
+
 
 # pylint: enable=arguments-differ

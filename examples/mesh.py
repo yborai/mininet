@@ -27,27 +27,26 @@ Although the iperf client uses more CPU and should be CPU bound (?),
 we measure the received data at the server since the client transmit
 rate includes buffering.
 """
-
 import time
 from mininet.net import Mininet
 from mininet.node import CPULimitedHost
-from mininet.topolib import TreeTopo
+from mininet.topolib import TorusTopo
+from mininet.topo import Topo
 from mininet.util import custom, waitListening
 from mininet.log import setLogLevel, info
-from mininet.topo import LinearTopo
 
 
 def bwtest( cpuLimits, k_list, period_us=100000, seconds=10 ):
     """Example/test of link and CPU bandwidth limits
        cpu: cpu limit as fraction of overall CPU time"""
 
-    results = {}
     times = []
+    results = {}
 
     for sched in 'rt', 'cfs':
         info( '*** Testing with', sched, 'bandwidth limiting\n' )
         for cpu in range(len(cpuLimits)):
-            topo = LinearTopo(k=k_list[cpu], n=k_list[cpu])
+            topo = MeshTopo(switchnum=k_list[cpu])
             # cpu is the cpu fraction for all hosts, so we divide
             # it across two hosts
             host = custom( CPULimitedHost, sched=sched,
@@ -59,15 +58,11 @@ def bwtest( cpuLimits, k_list, period_us=100000, seconds=10 ):
             except:
                 info( '*** Skipping scheduler %s\n' % sched )
                 break
-            print("check 1")
             net.start()
             start = time.time()
             net.pingAll()
-            print("check 2")
             end = time.time()
-            print(end-start)
             hosts = [ net.getNodeByName( h ) for h in topo.hosts() ]
-            print("check 3")
             client, server = hosts[ 0 ], hosts[ -1 ]
             info( '*** Starting iperf with %d%% of CPU allocated to hosts\n' %
                   ( 100.0 * cpuLimits[cpu] ) )
@@ -85,7 +80,8 @@ def bwtest( cpuLimits, k_list, period_us=100000, seconds=10 ):
             updated = results.get( sched, [] )
             updated += [ ( cpuLimits[cpu], bps ) ]
             results[ sched ] = updated
-            times.append(end-start)
+            times.append(end - start)
+            print(end - start)
 
     return results, times
 
@@ -106,12 +102,49 @@ def dump( results ):
             info( fmt % ( sched, pct, mbps ) )
 
 
+class MeshTopo(Topo):
+    "Demo Setup"
+
+    def __init__( self, switchnum=3, enable_all = True ):
+        "Create custom topo."
+
+        Topo.__init__( self )
+
+        # Init values
+        switches = switchnum   # total switchs
+        cons = switchnum        # connections with next switch
+        if cons >= switches:
+                cons = switches - 1
+        hosts = 1      # nodes per switch
+
+        # Create host and Switch
+        # Add link :: host to switch
+        for s_num in range(1,switches+1):
+                switch = self.addSwitch("s%s" %(s_num))
+                for h_num in range(1,hosts+1):
+                        host = self.addHost("h%s" %(h_num + ((s_num - 1) * hosts)))
+                        self.addLink(host,switch)
+
+        # Add link :: switch to switch
+        for src in range(1,switches+1):
+                for c_num in range(1,cons+1):
+                        dst = src + c_num
+                        if dst <= switches:
+                                print("s%s" %src,"s%s" %dst)
+                                self.addLink("s%s" %src,"s%s" %dst)
+                        else:
+                                dst = dst - switches
+                                if src - dst > cons:
+                                        print("s%s" %src,"s%s" %dst)
+                                        self.addLink("s%s" %src,"s%s" %dst)
+
+
 if __name__ == '__main__':
     setLogLevel( 'info' )
     # These are the limits for the hosts/iperfs - the
     # rest is for system processes
-    limits = [ .25, .0625, .015]
-    depth = [ 2, 4, 8 ]
-    out, times= bwtest( limits, depth )
+    limits = [ .25, .0625, .015 ]
+    k = [ 4, 16, 64 ]
+    out, times = bwtest( limits, k )
     dump( out )
     print(times)
