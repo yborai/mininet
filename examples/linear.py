@@ -28,41 +28,49 @@ we measure the received data at the server since the client transmit
 rate includes buffering.
 """
 
+import time
 from mininet.net import Mininet
 from mininet.node import CPULimitedHost
 from mininet.topolib import TreeTopo
 from mininet.util import custom, waitListening
 from mininet.log import setLogLevel, info
+from mininet.topo import LinearTopo
 
 
-def bwtest( cpuLimits, period_us=100000, seconds=10 ):
+def bwtest( cpuLimits, k_list, period_us=100000, seconds=10 ):
     """Example/test of link and CPU bandwidth limits
        cpu: cpu limit as fraction of overall CPU time"""
 
-    topo = TreeTopo( depth=2, fanout=2 )
-
     results = {}
+    times = []
 
     for sched in 'rt', 'cfs':
         info( '*** Testing with', sched, 'bandwidth limiting\n' )
-        for cpu in cpuLimits:
+        for cpu in range(len(cpuLimits)):
+            topo = LinearTopo(k=k_list[cpu]/4, n=4)
             # cpu is the cpu fraction for all hosts, so we divide
             # it across two hosts
             host = custom( CPULimitedHost, sched=sched,
                            period_us=period_us,
-                           cpu=.25*cpu )
+                           cpu=cpuLimits[cpu]*.5 )
             try:
                 net = Mininet( topo=topo, host=host )
             # pylint: disable=bare-except
             except:
                 info( '*** Skipping scheduler %s\n' % sched )
                 break
+            print("check 1")
             net.start()
+            start = time.time()
             net.pingAll()
+            print("check 2")
+            end = time.time()
+            print(end-start)
             hosts = [ net.getNodeByName( h ) for h in topo.hosts() ]
+            print("check 3")
             client, server = hosts[ 0 ], hosts[ -1 ]
             info( '*** Starting iperf with %d%% of CPU allocated to hosts\n' %
-                  ( 100.0 * cpu ) )
+                  ( 100.0 * cpuLimits[cpu] ) )
             # We measure at the server because it doesn't include
             # the client's buffer fill rate
             popen = server.popen( 'iperf -yc -s -p 5001' )
@@ -75,10 +83,11 @@ def bwtest( cpuLimits, period_us=100000, seconds=10 ):
             popen.terminate()
             net.stop()
             updated = results.get( sched, [] )
-            updated += [ ( cpu, bps ) ]
+            updated += [ ( cpuLimits[cpu], bps ) ]
             results[ sched ] = updated
+            times.append(end-start)
 
-    return results
+    return results, times
 
 
 def dump( results ):
@@ -101,6 +110,8 @@ if __name__ == '__main__':
     setLogLevel( 'info' )
     # These are the limits for the hosts/iperfs - the
     # rest is for system processes
-    limits = [ .25, .2, .15, .1, .05 ]
-    out = bwtest( limits )
+    limits = [ .25, .0625, .015]
+    depth = [ 4, 16, 64]
+    out, times= bwtest( limits, depth )
     dump( out )
+    print(times)
